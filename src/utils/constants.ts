@@ -1,4 +1,6 @@
 const APPS_KEY = 'garuda_selectedApps';
+const FAVORITES_KEY = 'garuda_favorites';
+const MAX_FAVORITES = 3;
 
 const STAGE = {
   AppsSetup: 'AppsSetup',
@@ -7,4 +9,4 @@ const STAGE = {
 
 type Stages = keyof typeof STAGE;
 
-export { APPS_KEY, STAGE, type Stages };
+export { APPS_KEY, FAVORITES_KEY, MAX_FAVORITES, STAGE, type Stages };
