@@ -1,27 +1,10 @@
-import { LocalStorage, showToast, Toast } from '@raycast/api';
+import { showToast, Toast } from '@raycast/api';
 import { FAVORITES_KEY, MAX_FAVORITES } from '@utils/constants';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useLocalStorage } from 'react-use';
 
 export function useFavorites() {
-  const [favorites, setFavorites] = useState<string[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      const stored = await LocalStorage.getItem<string>(FAVORITES_KEY);
-      if (stored) {
-        try {
-          setFavorites(JSON.parse(stored));
-        } catch {
-          setFavorites([]);
-        }
-      }
-    })();
-  }, []);
-
-  const saveFavorites = useCallback(async (next: string[]) => {
-    setFavorites(next);
-    await LocalStorage.setItem(FAVORITES_KEY, JSON.stringify(next));
-  }, []);
+  const [favorites = [], setFavorites] = useLocalStorage<string[]>(FAVORITES_KEY, []);
 
   const addFavorite = useCallback(
     async (project: string) => {
@@ -37,23 +20,24 @@ export function useFavorites() {
         });
         return;
       }
-      const next = [...favorites, project];
-      await saveFavorites(next);
+      setFavorites([...favorites, project]);
       await showToast({ title: `⭐ "${project}" added to favorites` });
     },
-    [favorites, saveFavorites],
+    [favorites, setFavorites],
   );
 
   const removeFavorite = useCallback(
     async (project: string) => {
-      const next = favorites.filter((f) => f !== project);
-      await saveFavorites(next);
+      setFavorites(favorites.filter((f) => f !== project));
       await showToast({ title: `Removed "${project}" from favorites` });
     },
-    [favorites, saveFavorites],
+    [favorites, setFavorites],
   );
 
-  const isFavorite = useCallback((project: string) => favorites.includes(project), [favorites]);
+  const isFavorite = useMemo(
+    () => (project: string) => favorites.includes(project),
+    [favorites],
+  );
 
   const sortWithFavorites = useCallback(
     (projects: string[]) => {
