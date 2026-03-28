@@ -2,8 +2,9 @@ import { useGarudaLaunchContext } from '@hooks/useGarudaLaunchContext';
 import { Action, ActionPanel, Keyboard, List, LocalStorage, showToast } from '@raycast/api';
 import { showFailureToast } from '@raycast/utils';
 import { APPS_KEY } from '@utils/constants';
-import { readProjects } from '@utils/helpers';
+import { readProjects, RecentProject, getRecentProjects, trackRecentProject } from '@utils/helpers';
 import { join } from 'path';
+import { useEffect, useState } from 'react';
 
 interface Props {
   base: string;
@@ -12,6 +13,8 @@ interface Props {
 
 export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
   const { setStage, setSelectedApps } = useGarudaLaunchContext();
+  const [recentProjects, setRecentProjects] = useState<RecentProject[]>([]);
+
   const repos = (() => {
     try {
       return readProjects(base) || [];
@@ -20,45 +23,71 @@ export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
     }
   })();
 
+  useEffect(() => {
+    getRecentProjects().then(setRecentProjects);
+  }, []);
+
+  async function handleProjectOpen(projectName: string) {
+    const updated = await trackRecentProject(projectName);
+    setRecentProjects(updated);
+  }
+
+  async function handleResetApplications() {
+    try {
+      await LocalStorage.removeItem(APPS_KEY);
+      setStage('AppsSetup');
+      setSelectedApps([]);
+      showToast({ title: 'Applications reset successfully' });
+    } catch (error) {
+      showFailureToast(error, { title: 'Failed to reset applications' });
+    }
+  }
+
+  const recentNames = new Set(recentProjects.map((r) => r.name));
+
+  const renderProjectItem = (proj: string) => {
+    const target = join(base, proj);
+    return (
+      <List.Item
+        key={proj}
+        title={proj}
+        actions={
+          <ActionPanel>
+            {appEntries.map(({ path, name, hotkey }) => (
+              <Action.Open
+                key={path}
+                title={`Open in ${name}`}
+                target={target}
+                application={path}
+                shortcut={{ modifiers: ['cmd'], key: hotkey as Keyboard.KeyEquivalent }}
+                onOpen={() => handleProjectOpen(proj)}
+              />
+            ))}
+            <Action
+              title="Reset Applications"
+              icon={{ source: 'arrow.counterclockwise' }}
+              onAction={handleResetApplications}
+            />
+          </ActionPanel>
+        }
+      />
+    );
+  };
+
   return (
     <List searchBarPlaceholder="Select a project…">
+      {recentProjects.length > 0 && (
+        <List.Section title="Recently Opened">
+          {recentProjects
+            .filter((r) => repos.includes(r.name))
+            .map((r) => renderProjectItem(r.name))}
+        </List.Section>
+      )}
+
       <List.Section title="Projects">
-        {repos.map((proj) => {
-          const target = join(base, proj);
-          return (
-            <List.Item
-              key={proj}
-              title={proj}
-              actions={
-                <ActionPanel>
-                  {appEntries.map(({ path, name, hotkey }) => (
-                    <Action.Open
-                      key={path}
-                      title={`Open in ${name}`}
-                      target={target}
-                      application={path}
-                      shortcut={{ modifiers: ['cmd'], key: hotkey as Keyboard.KeyEquivalent }}
-                    />
-                  ))}
-                  <Action
-                    title="Reset Applications"
-                    icon={{ source: 'arrow.counterclockwise' }}
-                    onAction={async () => {
-                      try {
-                        await LocalStorage.removeItem(APPS_KEY);
-                        setStage('AppsSetup');
-                        setSelectedApps([]);
-                        showToast({ title: 'Applications reset successfully' });
-                      } catch (error) {
-                        showFailureToast(error, { title: 'Failed to reset applications' });
-                      }
-                    }}
-                  />
-                </ActionPanel>
-              }
-            />
-          );
-        })}
+        {repos
+          .filter((proj) => !recentNames.has(proj))
+          .map((proj) => renderProjectItem(proj))}
       </List.Section>
 
       <List.Section title="Hotkeys">
