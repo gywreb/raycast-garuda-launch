@@ -4,6 +4,7 @@ import { showFailureToast } from '@raycast/utils';
 import { APPS_KEY } from '@utils/constants';
 import { readProjects } from '@utils/helpers';
 import { join } from 'path';
+import { useState, useMemo } from 'react';
 
 interface Props {
   base: string;
@@ -12,6 +13,8 @@ interface Props {
 
 export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
   const { setStage, setSelectedApps } = useGarudaLaunchContext();
+  const [searchText, setSearchText] = useState('');
+
   const repos = (() => {
     try {
       return readProjects(base) || [];
@@ -20,10 +23,24 @@ export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
     }
   })();
 
+  const filteredRepos = useMemo(() => {
+    if (!searchText) return repos;
+    const query = searchText.toLowerCase();
+    return repos.filter((proj) => proj.toLowerCase().includes(query));
+  }, [repos, searchText]);
+
   return (
-    <List searchBarPlaceholder="Select a project…">
+    <List
+      filtering={false}
+      onSearchTextChange={setSearchText}
+      searchBarPlaceholder="Search projects by name…"
+    >
+      {filteredRepos.length === 0 && searchText && (
+        <List.EmptyView title="No projects found" description={`No match for "${searchText}"`} />
+      )}
+
       <List.Section title="Projects">
-        {repos.map((proj) => {
+        {filteredRepos.map((proj) => {
           const target = join(base, proj);
           return (
             <List.Item
@@ -61,11 +78,13 @@ export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
         })}
       </List.Section>
 
-      <List.Section title="Hotkeys">
-        {appEntries.map(({ name, hotkey, path }) => (
-          <List.Item key={path} title={`⌘ + ${hotkey} : ${name}`} icon={{ fileIcon: path }} />
-        ))}
-      </List.Section>
+      {!searchText && (
+        <List.Section title="Hotkeys">
+          {appEntries.map(({ name, hotkey, path }) => (
+            <List.Item key={path} title={`⌘ + ${hotkey} : ${name}`} icon={{ fileIcon: path }} />
+          ))}
+        </List.Section>
+      )}
     </List>
   );
 };
