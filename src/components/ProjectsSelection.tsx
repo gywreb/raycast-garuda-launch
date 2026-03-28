@@ -4,6 +4,7 @@ import { showFailureToast } from '@raycast/utils';
 import { APPS_KEY } from '@utils/constants';
 import { readProjects } from '@utils/helpers';
 import { join } from 'path';
+import { useState, useMemo } from 'react';
 
 interface Props {
   base: string;
@@ -12,6 +13,7 @@ interface Props {
 
 export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
   const { setStage, setSelectedApps } = useGarudaLaunchContext();
+  const [searchText, setSearchText] = useState('');
   const repos = (() => {
     try {
       return readProjects(base) || [];
@@ -20,10 +22,20 @@ export const ProjectsSelection: React.FC<Props> = ({ base, appEntries }) => {
     }
   })();
 
+  const filteredRepos = useMemo(() => {
+    if (!searchText) return repos;
+    const query = searchText.toLowerCase();
+    return repos.filter((proj) => proj.toLowerCase().includes(query));
+  }, [repos, searchText]);
+
   return (
-    <List searchBarPlaceholder="Select a project…">
-      <List.Section title="Projects">
-        {repos.map((proj) => {
+    <List
+      searchBarPlaceholder="Search projects…"
+      filtering={false}
+      onSearchTextChange={setSearchText}
+    >
+      <List.Section title="Projects" subtitle={`${filteredRepos.length} projects`}>
+        {filteredRepos.map((proj) => {
           const target = join(base, proj);
           return (
             <List.Item
