@@ -1,4 +1,6 @@
+import { LocalStorage } from '@raycast/api';
 import { showFailureToast } from '@raycast/utils';
+import { MAX_RECENT_PROJECTS, RECENT_PROJECTS_KEY } from '@utils/constants';
 import { existsSync, readdirSync } from 'fs';
 import { homedir } from 'os';
 import { join, resolve } from 'path';
@@ -63,4 +65,37 @@ export function validateSelectedApplications(apps: string[]) {
     showFailureToast(new Error('Validation error'), { title: 'Max 10 apps allowed' });
   }
   return isValid;
+}
+
+export interface RecentProject {
+  name: string;
+  lastOpenedAt: number;
+}
+
+/**
+ * Retrieves the list of recently opened projects from LocalStorage.
+ */
+export async function getRecentProjects(): Promise<RecentProject[]> {
+  const stored = await LocalStorage.getItem<string>(RECENT_PROJECTS_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored) as RecentProject[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Tracks a project open by upserting its entry in the recent projects list.
+ * Keeps only the most recent MAX_RECENT_PROJECTS entries.
+ */
+export async function trackRecentProject(projectName: string): Promise<RecentProject[]> {
+  const recents = await getRecentProjects();
+  const filtered = recents.filter((r) => r.name !== projectName);
+  const updated: RecentProject[] = [{ name: projectName, lastOpenedAt: Date.now() }, ...filtered].slice(
+    0,
+    MAX_RECENT_PROJECTS,
+  );
+  await LocalStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(updated));
+  return updated;
 }
